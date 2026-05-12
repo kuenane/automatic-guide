@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>UK 49s — Draw Results & Analyser</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+<style>
+/* ── Reset & tokens ──────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0b0f14;
+  --surface:   #111720;
+  --surface2:  #192030;
+  --border:    #1e2d42;
+  --accent:    #00d4ff;
+  --accent2:   #ff6b35;
+  --text:      #e8edf5;
+  --muted:     #5a7a9a;
+  --success:   #00e676;
+  --error:     #ff4444;
+
+  --red:    #ff4444; --orange: #ff8c42; --yellow: #ffd166;
+  --green:  #06d6a0; --blue:   #118ab2; --brown:  #8b5e3c; --purple: #7b2d8b;
+
+  --font-display: 'Bebas Neue', sans-serif;
+  --font-mono:    'DM Mono', monospace;
+  --font-body:    'DM Sans', sans-serif;
+
+  --radius: 8px;
+  --glow: 0 0 20px rgba(0,212,255,.15);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Noise texture overlay ───────────────────────────────── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Layout ──────────────────────────────────────────────── */
+.wrap { position: relative; z-index: 1; max-width: 1280px; margin: 0 auto; padding: 0 24px 80px; }
+
+/* ── Header ──────────────────────────────────────────────── */
+header {
+  display: flex;
+  align-items: flex-end;
+  gap: 24px;
+  padding: 40px 0 32px;
+  border-bottom: 1px solid var(--border);
+}
+.logo-mark {
+  width: 52px; height: 52px;
+  background: var(--accent);
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display);
+  font-size: 26px;
+  color: var(--bg);
+  flex-shrink: 0;
+  box-shadow: var(--glow);
+}
+.logo-text h1 { font-family: var(--font-display); font-size: 36px; letter-spacing: 2px; line-height: 1; }
+.logo-text p  { color: var(--muted); font-size: 12px; margin-top: 4px; letter-spacing: .5px; }
+.header-right { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--muted);
+  transition: background .3s;
+}
+.status-dot.live { background: var(--success); box-shadow: 0 0 8px var(--success); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* ── Tabs ────────────────────────────────────────────────── */
+.tabs { display: flex; gap: 4px; padding: 28px 0 0; }
+.tab {
+  padding: 9px 20px;
+  border-radius: var(--radius) var(--radius) 0 0;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  background: var(--surface);
+  color: var(--muted);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all .2s;
+  letter-spacing: .3px;
+}
+.tab:hover { color: var(--text); background: var(--surface2); }
+.tab.active { background: var(--surface2); color: var(--accent); border-color: var(--accent); border-bottom-color: var(--surface2); }
+
+/* ── Panel ───────────────────────────────────────────────── */
+.panel {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 0 var(--radius) var(--radius) var(--radius);
+  padding: 28px;
+  display: none;
+}
+.panel.active { display: block; }
+
+/* ── Controls bar ────────────────────────────────────────── */
+.controls {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.draw-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.pill {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all .2s;
+}
+.pill:hover  { border-color: var(--accent); color: var(--text); }
+.pill.active { border-color: var(--accent); background: rgba(0,212,255,.12); color: var(--accent); }
+
+.num-select {
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+.num-select:focus { outline: none; border-color: var(--accent); }
+
+.btn {
+  padding: 8px 20px;
+  border-radius: 20px;
+  border: none;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all .2s;
+  display: flex; align-items: center; gap: 6px;
+}
+.btn-primary { background: var(--accent); color: var(--bg); }
+.btn-primary:hover { background: #33ddff; box-shadow: var(--glow); }
+.btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+.btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+.btn-ghost:hover { border-color: var(--text); color: var(--text); }
+
+.spinner {
+  width: 14px; height: 14px;
+  border: 2px solid transparent;
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+  display: none;
+}
+.spinner.show { display: block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Draw sections ───────────────────────────────────────── */
+.draw-section { margin-bottom: 36px; }
+.draw-section:last-child { margin-bottom: 0; }
+
+.draw-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.draw-icon {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px;
+}
+.draw-title { font-family: var(--font-display); font-size: 20px; letter-spacing: 1px; }
+.draw-time  { margin-left: auto; font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.draw-count { font-size: 11px; color: var(--muted); background: var(--surface); padding: 3px 8px; border-radius: 10px; }
+
+/* ── Result cards ────────────────────────────────────────── */
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+.result-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  transition: border-color .2s, transform .15s;
+  cursor: default;
+}
+.result-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.result-date { font-size: 11px; color: var(--muted); margin-bottom: 10px; font-family: var(--font-mono); }
+.balls { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+.ball {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,.4);
+  flex-shrink: 0;
+}
+.ball-divider { color: var(--border); font-size: 18px; margin: 0 2px; }
+.ball.bonus { border: 2px solid var(--accent2); box-shadow: 0 0 10px rgba(255,107,53,.3); }
+
+/* Ball colours */
+.c-Red    { background: var(--red); }
+.c-Orange { background: var(--orange); }
+.c-Yellow { background: var(--yellow); color: #222 !important; }
+.c-Green  { background: var(--green); color: #222 !important; }
+.c-Blue   { background: var(--blue); }
+.c-Brown  { background: var(--brown); }
+.c-Purple { background: var(--purple); }
+
+/* ── Analyser tab ────────────────────────────────────────── */
+.analyser-grid {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 800px) { .analyser-grid { grid-template-columns: 1fr; } }
+
+.input-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+.input-card h3 { font-family: var(--font-display); font-size: 18px; letter-spacing: 1px; margin-bottom: 18px; color: var(--accent); }
+
+.field-row { margin-bottom: 14px; }
+.field-row label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 5px; letter-spacing: .5px; text-transform: uppercase; }
+
+.ball-inputs { display: flex; gap: 6px; flex-wrap: wrap; }
+.ball-input {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  text-align: center;
+  transition: border-color .2s, box-shadow .2s;
+  -moz-appearance: textfield;
+}
+.ball-input::-webkit-outer-spin-button,
+.ball-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+.ball-input:focus { outline: none; border-color: var(--accent); box-shadow: var(--glow); }
+.ball-input.bonus-input { border-color: var(--accent2); }
+.ball-input.bonus-input:focus { border-color: var(--accent2); box-shadow: 0 0 12px rgba(255,107,53,.25); }
+
+.tse-input {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  transition: border-color .2s;
+}
+.tse-input:focus { outline: none; border-color: var(--accent); }
+
+.auto-fill-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.auto-pill {
+  padding: 5px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.auto-pill:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Analysis output ─────────────────────────────────────── */
+.analysis-output { display: none; }
+.analysis-output.show { display: block; }
+
+.analysis-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.analysis-card h4 {
+  font-family: var(--font-display);
+  font-size: 16px;
+  letter-spacing: 1px;
+  margin-bottom: 14px;
+  color: var(--accent);
+  display: flex; align-items: center; gap: 8px;
+}
+.analysis-card h4 .badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  background: rgba(0,212,255,.1);
+  border: 1px solid rgba(0,212,255,.2);
+  color: var(--accent);
+  padding: 2px 7px;
+  border-radius: 10px;
+  letter-spacing: .5px;
+}
+
+/* Intermediates grid */
+.x-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 8px;
+}
+.x-item {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  text-align: center;
+}
+.x-item .x-label { font-size: 10px; color: var(--muted); font-family: var(--font-mono); }
+.x-item .x-val   { font-size: 16px; font-family: var(--font-mono); font-weight: 500; color: var(--text); }
+
+/* Sets row */
+.sets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+.set-chip {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.set-chip .set-label { font-size: 10px; color: var(--muted); font-family: var(--font-mono); margin-bottom: 6px; }
+.set-chip .set-nums  { display: flex; flex-wrap: wrap; gap: 4px; }
+.mini-ball {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  color: #fff;
+  flex-shrink: 0;
+}
+.mini-ball.c-Yellow, .mini-ball.c-Green { color: #222; }
+
+/* Colour/digit group cards */
+.group-list { display: flex; flex-direction: column; gap: 12px; }
+.group-card {
+  background: var(--surface2);
+  border-radius: 6px;
+  padding: 12px 14px;
+  border-left: 3px solid;
+}
+.group-card .group-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.group-name { font-weight: 500; font-size: 13px; }
+.group-nums { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; }
+
+.tag-ball {
+  display: inline-flex; align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 2px 8px 2px 4px;
+  gap: 4px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+.tag-ball .dot { width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 500; color: #fff; }
+.tag-ball .dot.c-Yellow, .tag-ball .dot.c-Green { color: #222; }
+
+.combos { display: flex; flex-wrap: wrap; gap: 6px; }
+.combo-tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 8px;
+  color: var(--muted);
+}
+
+/* ── Empty / error states ────────────────────────────────── */
+.empty {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--muted);
+}
+.empty .icon { font-size: 36px; margin-bottom: 10px; opacity: .4; }
+.empty p { font-size: 13px; }
+
+.error-msg {
+  background: rgba(255,68,68,.08);
+  border: 1px solid rgba(255,68,68,.25);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  color: var(--error);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  margin-bottom: 16px;
+  display: none;
+}
+.error-msg.show { display: block; }
+
+/* ── Colour legend ───────────────────────────────────────── */
+.legend {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+.legend-dot  { width: 12px; height: 12px; border-radius: 50%; }
+
+/* ── Section label ───────────────────────────────────────── */
+.section-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 20px 0 10px;
+}
+
+/* ── Colour group border colours ─────────────────────────── */
+.gc-Red    { border-color: var(--red); }
+.gc-Orange { border-color: var(--orange); }
+.gc-Yellow { border-color: var(--yellow); }
+.gc-Green  { border-color: var(--green); }
+.gc-Blue   { border-color: var(--blue); }
+.gc-Brown  { border-color: var(--brown); }
+.gc-Purple { border-color: var(--purple); }
+.gc-digit  { border-color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Header -->
+  <header>
+    <div class="logo-mark">49</div>
+    <div class="logo-text">
+      <h1>UK 49S</h1>
+      <p>DRAW RESULTS &amp; PREDICTION ANALYSER</p>
+    </div>
+    <div class="header-right">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText" style="font-size:11px;color:var(--muted)">—</span>
+    </div>
+  </header>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" data-tab="results">Results</button>
+    <button class="tab" data-tab="analyser">Analyser</button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════ Results Panel -->
+  <div class="panel active" id="tab-results">
+
+    <div class="legend">
+      <span style="font-size:11px;color:var(--muted);margin-right:4px;">Colour key:</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--red)"></span>Red 1–7</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--orange)"></span>Orange 8–14</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--yellow)"></span>Yellow 15–21</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--green)"></span>Green 22–28</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--blue)"></span>Blue 29–36</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--brown)"></span>Brown 37–42</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--purple)"></span>Purple 43–49</span>
+    </div>
+
+    <div class="controls">
+      <div class="draw-pills">
+        <button class="pill active" data-draw="all">All Draws</button>
+        <button class="pill" data-draw="brunch">Brunchtime</button>
+        <button class="pill" data-draw="lunch">Lunchtime</button>
+        <button class="pill" data-draw="drive">Drivetime</button>
+        <button class="pill" data-draw="tea">Teatime</button>
+      </div>
+      <select class="num-select" id="numSelect">
+        <option value="5">5 draws</option>
+        <option value="10" selected>10 draws</option>
+        <option value="15">15 draws</option>
+        <option value="20">20 draws</option>
+      </select>
+      <button class="btn btn-primary" id="fetchBtn">
+        <span class="spinner" id="fetchSpinner"></span>
+        <span id="fetchBtnLabel">Fetch Results</span>
+      </button>
+    </div>
+
+    <div class="error-msg" id="resultsError"></div>
+    <div id="resultsContainer">
+      <div class="empty">
+        <div class="icon">🎱</div>
+        <p>Select a draw type and click <strong>Fetch Results</strong></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════ Analyser Panel -->
+  <div class="panel" id="tab-analyser">
+    <div class="analyser-grid">
+
+      <!-- Input card -->
+      <div>
+        <div class="input-card">
+          <h3>Enter Draw Numbers</h3>
+
+          <div class="auto-fill-row" id="autoFillRow">
+            <span style="font-size:11px;color:var(--muted);align-self:center;">Auto-fill from:</span>
+          </div>
+
+          <div class="field-row">
+            <label>Main Balls (r1 – r6)</label>
+            <div class="ball-inputs">
+              <input class="ball-input" id="r1" type="number" min="1" max="49" placeholder="r1" />
+              <input class="ball-input" id="r2" type="number" min="1" max="49" placeholder="r2" />
+              <input class="ball-input" id="r3" type="number" min="1" max="49" placeholder="r3" />
+              <input class="ball-input" id="r4" type="number" min="1" max="49" placeholder="r4" />
+              <input class="ball-input" id="r5" type="number" min="1" max="49" placeholder="r5" />
+              <input class="ball-input" id="r6" type="number" min="1" max="49" placeholder="r6" />
+            </div>
+          </div>
+
+          <div class="field-row">
+            <label>Bonus Ball (r7)</label>
+            <div class="ball-inputs">
+              <input class="ball-input bonus-input" id="r7" type="number" min="1" max="49" placeholder="r7" />
+            </div>
+          </div>
+
+          <div class="field-row">
+            <label>TSE value <span style="font-weight:300;text-transform:none;">(optional — auto-calculated if blank)</span></label>
+            <input class="tse-input" id="tseInput" type="text" maxlength="4" placeholder="e.g. 27" />
+          </div>
+
+          <button class="btn btn-primary" id="analyseBtn" style="width:100%;justify-content:center;margin-top:4px;">
+            <span class="spinner" id="analyseSpinner"></span>
+            <span id="analyseBtnLabel">Run Analysis</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Output -->
+      <div>
+        <div class="error-msg" id="analyseError"></div>
+        <div id="analysisOutput" class="analysis-output">
+
+          <!-- Intermediates -->
+          <div class="analysis-card" id="cardIntermediates">
+            <h4>Intermediate Values <span class="badge">x1 – x9</span></h4>
+            <div class="x-grid" id="xGrid"></div>
+          </div>
+
+          <!-- Sets -->
+          <div class="analysis-card" id="cardSets">
+            <h4>Candidate Sets</h4>
+            <div class="sets-grid" id="setsGrid"></div>
+          </div>
+
+          <!-- By colour -->
+          <div class="analysis-card" id="cardColour">
+            <h4>By Colour <span class="badge">3+ numbers</span></h4>
+            <div class="group-list" id="colourGroups"></div>
+          </div>
+
+          <!-- By ending digit -->
+          <div class="analysis-card" id="cardDigit">
+            <h4>By Ending Digit <span class="badge">3+ numbers</span></h4>
+            <div class="group-list" id="digitGroups"></div>
+          </div>
+
+        </div>
+        <div id="analyserEmpty" class="empty">
+          <div class="icon">🔬</div>
+          <p>Enter a previous draw result and click <strong>Run Analysis</strong></p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /wrap -->
+
+<script>
+// ── Config ────────────────────────────────────────────────
+const API = '';   // same origin; change to 'http://localhost:5000' if serving separately
+
+// ── Colour helpers ────────────────────────────────────────
+const COLOUR_CSS = {
+  Red:'--red', Orange:'--orange', Yellow:'--yellow',
+  Green:'--green', Blue:'--blue', Brown:'--brown', Purple:'--purple'
+};
+function colourOf(n) {
+  if (n >=  1 && n <=  7) return 'Red';
+  if (n >=  8 && n <= 14) return 'Orange';
+  if (n >= 15 && n <= 21) return 'Yellow';
+  if (n >= 22 && n <= 28) return 'Green';
+  if (n >= 29 && n <= 36) return 'Blue';
+  if (n >= 37 && n <= 42) return 'Brown';
+  if (n >= 43 && n <= 49) return 'Purple';
+  return 'Unknown';
+}
+function ballColourClass(n) { return 'c-' + colourOf(n); }
+function ballColourVar(n)   { return `var(${COLOUR_CSS[colourOf(n)] || '--muted'})`; }
+
+// ── Ball HTML ─────────────────────────────────────────────
+function ballHTML(n, extraClass='') {
+  const cls = ballColourClass(n);
+  return `<div class="ball ${cls} ${extraClass}">${n}</div>`;
+}
+function miniBallHTML(n) {
+  const cls = ballColourClass(n);
+  return `<div class="mini-ball ${cls}">${n}</div>`;
+}
+function tagBallHTML(n, setLabel) {
+  const cls = ballColourClass(n);
+  return `<span class="tag-ball"><span class="dot ${cls}">${n}</span>${setLabel}</span>`;
+}
+
+// ── Tab switching ─────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+// ── Draw pill selection ───────────────────────────────────
+let activeDraw = 'all';
+document.querySelectorAll('.pill').forEach(p => {
+  p.addEventListener('click', () => {
+    document.querySelectorAll('.pill').forEach(x => x.classList.remove('active'));
+    p.classList.add('active');
+    activeDraw = p.dataset.draw;
+  });
+});
+
+// ── Status indicator ──────────────────────────────────────
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API}/api/health`, {signal: AbortSignal.timeout(3000)});
+    const dot = document.getElementById('statusDot');
+    const txt = document.getElementById('statusText');
+    if (r.ok) {
+      dot.className = 'status-dot live';
+      txt.textContent = 'API online';
+    } else {
+      dot.className = 'status-dot';
+      txt.textContent = 'API error';
+    }
+  } catch {
+    document.getElementById('statusDot').className = 'status-dot';
+    document.getElementById('statusText').textContent = 'API offline';
+  }
+}
+checkHealth();
+
+// ── Fetch Results ─────────────────────────────────────────
+const fetchBtn    = document.getElementById('fetchBtn');
+const fetchSpinner= document.getElementById('fetchSpinner');
+const resultsErr  = document.getElementById('resultsError');
+
+// Cache of last fetched results for auto-fill
+let lastResults = {};
+
+fetchBtn.addEventListener('click', fetchResults);
+
+async function fetchResults() {
+  const num = document.getElementById('numSelect').value;
+  setLoading(fetchBtn, fetchSpinner, document.getElementById('fetchBtnLabel'), true);
+  resultsErr.classList.remove('show');
+  document.getElementById('resultsContainer').innerHTML = '';
+
+  try {
+    const res  = await fetch(`${API}/api/results?draw=${activeDraw}&num=${num}`);
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error);
+    lastResults = json.data;
+    renderResults(json.data);
+    updateAutoFill(json.data);
+  } catch(e) {
+    resultsErr.textContent = e.message;
+    resultsErr.classList.add('show');
+    document.getElementById('resultsContainer').innerHTML =
+      `<div class="empty"><div class="icon">⚠️</div><p>${e.message}</p></div>`;
+  } finally {
+    setLoading(fetchBtn, fetchSpinner, document.getElementById('fetchBtnLabel'), false);
+  }
+}
+
+const DRAW_META = {
+  brunchtime: { label:'Brunchtime', time:'11:49 AM UK', icon:'🍳' },
+  lunchtime:  { label:'Lunchtime',  time:'12:49 PM UK', icon:'🥗' },
+  drivetime:  { label:'Drivetime',  time:'04:49 PM UK', icon:'🚗' },
+  teatime:    { label:'Teatime',    time:'05:49 PM UK', icon:'🍵' },
+};
+
+function renderResults(data) {
+  const container = document.getElementById('resultsContainer');
+  let html = '';
+
+  for (const [dtype, draws] of Object.entries(data)) {
+    const meta = DRAW_META[dtype] || { label: dtype, time:'', icon:'🎱' };
+    html += `
+      <div class="draw-section">
+        <div class="draw-header">
+          <div class="draw-icon" style="background:rgba(0,212,255,.1)">${meta.icon}</div>
+          <div class="draw-title">${meta.label.toUpperCase()}</div>
+          <span class="draw-count">${draws.length} draw${draws.length!==1?'s':''}</span>
+          <span class="draw-time">${meta.time}</span>
+        </div>`;
+
+    if (draws.length === 0) {
+      html += `<div class="empty"><div class="icon">📭</div><p>No results available</p></div>`;
+    } else {
+      html += `<div class="results-grid">`;
+      for (const r of draws) {
+        html += `<div class="result-card">
+          <div class="result-date">${r.date}</div>
+          <div class="balls">
+            ${r.numbers.map(n => ballHTML(n)).join('')}
+            ${r.bonus_ball !== null ? `<span class="ball-divider">|</span>${ballHTML(r.bonus_ball,'bonus')}` : ''}
+          </div>
+        </div>`;
+      }
+      html += `</div>`;
+    }
+    html += `</div>`;
+  }
+
+  container.innerHTML = html || `<div class="empty"><div class="icon">📭</div><p>No data returned</p></div>`;
+}
+
+// ── Auto-fill buttons ─────────────────────────────────────
+function updateAutoFill(data) {
+  const row = document.getElementById('autoFillRow');
+  const existing = row.querySelectorAll('.auto-pill');
+  existing.forEach(e => e.remove());
+
+  for (const [dtype, draws] of Object.entries(data)) {
+    if (!draws.length) continue;
+    const latest = draws[0];
+    const meta   = DRAW_META[dtype] || { label: dtype };
+    const btn    = document.createElement('button');
+    btn.className   = 'auto-pill';
+    btn.textContent = `Latest ${meta.label}`;
+    btn.addEventListener('click', () => {
+      latest.numbers.forEach((n, i) => {
+        document.getElementById('r' + (i+1)).value = n;
+      });
+      if (latest.bonus_ball) document.getElementById('r7').value = latest.bonus_ball;
+    });
+    row.appendChild(btn);
+  }
+}
+
+// ── Analyser ──────────────────────────────────────────────
+const analyseBtn    = document.getElementById('analyseBtn');
+const analyseSpinner= document.getElementById('analyseSpinner');
+const analyseErr    = document.getElementById('analyseError');
+
+analyseBtn.addEventListener('click', runAnalysis);
+
+async function runAnalysis() {
+  analyseErr.classList.remove('show');
+
+  const numbers = ['r1','r2','r3','r4','r5','r6'].map(id => {
+    const v = parseInt(document.getElementById(id).value);
+    return isNaN(v) ? null : v;
+  });
+  const bonus = parseInt(document.getElementById('r7').value);
+  const tse   = document.getElementById('tseInput').value.trim() || null;
+
+  if (numbers.some(n => n === null) || numbers.some(n => n < 1 || n > 49)) {
+    showErr(analyseErr, 'Please enter 6 valid main ball numbers (1–49).');
+    return;
+  }
+  if (isNaN(bonus) || bonus < 1 || bonus > 49) {
+    showErr(analyseErr, 'Please enter a valid bonus ball (1–49).');
+    return;
+  }
+
+  setLoading(analyseBtn, analyseSpinner, document.getElementById('analyseBtnLabel'), true);
+
+  try {
+    const res  = await fetch(`${API}/api/analyse`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ numbers, bonus, tse }),
+    });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error);
+    renderAnalysis(json.data, numbers, bonus);
+  } catch(e) {
+    showErr(analyseErr, e.message);
+  } finally {
+    setLoading(analyseBtn, analyseSpinner, document.getElementById('analyseBtnLabel'), false);
+  }
+}
+
+function renderAnalysis(data, numbers, bonus) {
+  document.getElementById('analyserEmpty').style.display = 'none';
+  const out = document.getElementById('analysisOutput');
+  out.classList.add('show');
+
+  // ── Intermediates
+  const xGrid = document.getElementById('xGrid');
+  xGrid.innerHTML = Object.entries(data.intermediates).map(([k,v]) =>
+    `<div class="x-item"><div class="x-label">${k}</div><div class="x-val">${v}</div></div>`
+  ).join('');
+
+  // ── Sets
+  const sGrid = document.getElementById('setsGrid');
+  const SET_LABELS = {
+    S1: 'Concat/Add', S2: 'Neighbour', S3: 'Date ±2', S4: 'TSE Digits', S5: 'x1–x3 Combos'
+  };
+  sGrid.innerHTML = Object.entries(data.sets).map(([key, nums]) => `
+    <div class="set-chip">
+      <div class="set-label">${key} — ${SET_LABELS[key]||''}</div>
+      <div class="set-nums">
+        ${nums.length ? nums.map(miniBallHTML).join('') : '<span style="color:var(--muted);font-size:11px;">none in 1–49</span>'}
+      </div>
+    </div>`
+  ).join('');
+
+  // ── By colour
+  const colGroup = document.getElementById('colourGroups');
+  if (data.colour_analysis.length === 0) {
+    colGroup.innerHTML = `<div class="empty" style="padding:20px"><p>No colour group has 3+ numbers</p></div>`;
+  } else {
+    colGroup.innerHTML = data.colour_analysis.map(g => `
+      <div class="group-card gc-${g.colour}">
+        <div class="group-header">
+          <span class="mini-ball c-${g.colour}" style="flex-shrink:0">&nbsp;</span>
+          <span class="group-name">${g.colour}</span>
+          <span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--muted)">${g.numbers.length} numbers</span>
+        </div>
+        <div class="group-nums">${g.numbers.map(i => tagBallHTML(i.number, i.set)).join('')}</div>
+        <div class="section-label" style="margin-top:8px;margin-bottom:6px">3-ball combinations (${g.combos.length})</div>
+        <div class="combos">${g.combos.map(c => `<span class="combo-tag">${c.join(' · ')}</span>`).join('')}</div>
+      </div>`
+    ).join('');
+  }
+
+  // ── By ending digit
+  const digGroup = document.getElementById('digitGroups');
+  if (data.digit_analysis.length === 0) {
+    digGroup.innerHTML = `<div class="empty" style="padding:20px"><p>No ending-digit group has 3+ numbers</p></div>`;
+  } else {
+    digGroup.innerHTML = data.digit_analysis.map(g => `
+      <div class="group-card gc-digit">
+        <div class="group-header">
+          <span class="group-name">Ends in ${g.digit}</span>
+          <span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--muted)">${g.numbers.length} numbers</span>
+        </div>
+        <div class="group-nums">${g.numbers.map(i => tagBallHTML(i.number, i.set)).join('')}</div>
+        <div class="section-label" style="margin-top:8px;margin-bottom:6px">3-ball combinations (${g.combos.length})</div>
+        <div class="combos">${g.combos.map(c => `<span class="combo-tag">${c.join(' · ')}</span>`).join('')}</div>
+      </div>`
+    ).join('');
+  }
+}
+
+// ── Utility helpers ───────────────────────────────────────
+function setLoading(btn, spinner, label, loading) {
+  btn.disabled = loading;
+  spinner.classList.toggle('show', loading);
+  label.textContent = loading ? 'Loading…' : (btn === fetchBtn ? 'Fetch Results' : 'Run Analysis');
+}
+function showErr(el, msg) {
+  el.textContent = msg;
+  el.classList.add('show');
+}
+</script>
+</body>
+</html>
