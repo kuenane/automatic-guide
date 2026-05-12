@@ -22,7 +22,7 @@ Usage (import):
     from uk49s_results import get_all_draws, get_draw_results, DrawType, analyse
 
 Requirements:
-    pip install playwright beautifulsoup4
+    pip install -r requirements.txt
     playwright install chromium
 """
 
@@ -36,6 +36,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Optional
+from tenacity import retry, stop_after_attempt, wait_exponential
+from dateutil import parser as date_parser
 
 
 # ===========================================================================
@@ -87,14 +89,31 @@ class AllDrawResults:
 
 
 # ===========================================================================
+# Constants
+# ===========================================================================
+
+COLOUR_RANGES = {
+    "Red":    range(1,  8),
+    "Orange": range(8,  15),
+    "Yellow": range(15, 22),
+    "Green":  range(22, 29),
+    "Blue":   range(29, 37),
+    "Brown":  range(37, 43),
+    "Purple": range(43, 50),
+}
+
+
+# ===========================================================================
 # Playwright fetch (bypasses bot detection)
 # ===========================================================================
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 def _fetch_playwright(url: str, timeout: int = 30000) -> Optional[BeautifulSoup]:
     """
     Fetch URL using Playwright Chromium (bypasses most bot detection).
     Returns BeautifulSoup object or None.
     """
+    try:
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(
@@ -136,14 +155,13 @@ def _fetch_playwright(url: str, timeout: int = 30000) -> Optional[BeautifulSoup]
 # Parsers
 # ===========================================================================
 
-def _extract_nums(tags) -> list:
-    """Pull valid lottery integers (1-49) from a list of BS4 tags."""
-    nums = []
-    for tag in tags:
-        txt = tag.get_text(strip=True)
-        if txt.isdigit() and 1 <= int(txt) <= 49:
-            nums.append(int(txt))
-    return nums
+def _parse_date(date_str: str) -> str:
+    """Parse and standardize date string."""
+    try:
+        parsed = date_parser.parse(date_str, fuzzy=True)
+        return parsed.strftime("%A %d %B %Y")
+    except:
+        return date_str  # fallback to original
 
 
 def _parse_lottonumbers(soup: BeautifulSoup, draw_type: DrawType, limit: int) -> list:
@@ -186,7 +204,7 @@ def _parse_national_lottery(soup: BeautifulSoup, draw_type: DrawType, limit: int
             continue
         results.append(DrawResult(
             draw_type  = draw_type,
-            date       = m.group(0).strip(),
+            date       = _parse_date(m.group(0).strip()),
             numbers    = sorted(nums[:6]),
             bonus_ball = nums[6] if len(nums) >= 7 else None,
         ))
@@ -218,7 +236,7 @@ def _parse_text_fallback(soup: BeautifulSoup, draw_type: DrawType, limit: int) -
             if len(nums) >= 6:
                 results.append(DrawResult(
                     draw_type  = draw_type,
-                    date       = date_str,
+                    date       = _parse_date(date_str),
                     numbers    = sorted(nums[:6]),
                     bonus_ball = nums[6] if len(nums) == 7 else None,
                 ))
@@ -336,18 +354,8 @@ def display_all(all_results: AllDrawResults) -> None:
 # Analyser
 # ===========================================================================
 
-COLOR_RANGES = {
-    "Red":    range(1,  8),
-    "Orange": range(8,  15),
-    "Yellow": range(15, 22),
-    "Green":  range(22, 29),
-    "Blue":   range(29, 37),
-    "Brown":  range(37, 43),
-    "Purple": range(43, 50),
-}
-
 def _colour_of(n: int) -> str:
-    for colour, rng in COLOR_RANGES.items():
+    for colour, rng in COLOUR_RANGES.items():
         if n in rng:
             return colour
     return "Unknown"
