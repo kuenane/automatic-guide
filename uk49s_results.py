@@ -22,14 +22,15 @@ Usage (import):
     from uk49s_results import get_all_draws, get_draw_results, DrawType, analyse
 
 Requirements:
-    pip install requests beautifulsoup4
+    pip install playwright beautifulsoup4
+    playwright install chromium
 """
 
 import re
 import sys
 import argparse
 import itertools
-import requests
+from playwright.sync_api import sync_playwright
 from bs4 import BeautifulSoup
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -86,37 +87,54 @@ class AllDrawResults:
 
 
 # ===========================================================================
-# HTTP session
+# Playwright fetch (bypasses bot detection)
 # ===========================================================================
 
-SESSION = requests.Session()
-SESSION.headers.update({
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/124.0.0.0 Safari/537.36"
-    ),
-    "Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
-    "Accept-Encoding": "gzip, deflate, br",
-    "Connection":      "keep-alive",
-})
+def _fetch_playwright(url: str, timeout: int = 30000) -> Optional[BeautifulSoup]:
+    """
+    Fetch URL using Playwright Chromium (bypasses most bot detection).
+    Returns BeautifulSoup object or None.
+    """
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(
+                headless=True,
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    "--disable-dev-shm-usage",
+                    "--no-sandbox"
+                ]
+            )
+            context = browser.new_context(
+                viewport={"width": 1280, "height": 800},
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            )
+            page = context.new_page()
+            
+            # Add stealth: hide webdriver property
+            page.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                // Remove Playwright-specific properties
+                delete navigator.__proto__.webdriver;
+            """)
+            
+            page.goto(url, timeout=timeout, wait_until="networkidle")
+            
+            # Wait a little for dynamic content to load
+            page.wait_for_timeout(2000)
+            
+            html = page.content()
+            browser.close()
+            return BeautifulSoup(html, "html.parser")
+            
+    except Exception as exc:
+        print(f"    [warn] Playwright error on {url}: {exc}")
+        return None
 
 
 # ===========================================================================
 # Parsers
 # ===========================================================================
-
-def _fetch(url: str, timeout: int = 15) -> Optional[BeautifulSoup]:
-    """Fetch a URL and return parsed HTML, or None on error."""
-    try:
-        resp = SESSION.get(url, timeout=timeout)
-        resp.raise_for_status()
-        return BeautifulSoup(resp.text, "html.parser")
-    except requests.RequestException as exc:
-        print(f"    [warn] {url} — {exc}")
-        return None
-
 
 def _extract_nums(tags) -> list:
     """Pull valid lottery integers (1-49) from a list of BS4 tags."""
@@ -214,13 +232,13 @@ def _make_sources(draw_type: DrawType) -> list:
     slug = draw_type.value
     return [
         {
-            "name":   "uk.lottonumbers.com",
-            "url":    f"https://uk.lottonumbers.com/uk49s-{slug}/results",
+            "name":   "www.lotteryextreme.com",
+            "url":    f"https://www.lotteryextreme.com/49s-{slug}/results",
             "parser": _parse_lottonumbers,
         },
         {
-            "name":   "za.national-lottery.com",
-            "url":    f"https://za.national-lottery.com/uk-49s/results/{slug}",
+            "name":   "www.49s.co.uk",
+            "url":    f"https://49s.co.uk/49s/results/{slug}",
             "parser": _parse_national_lottery,
         },
         {
@@ -258,7 +276,7 @@ def get_draw_results(draw_type: DrawType, num_draws: int = 10) -> list:
     print(f"\n[{label}]")
     for source in _make_sources(draw_type):
         print(f"  Trying {source['name']} ...", end=" ", flush=True)
-        soup = _fetch(source["url"])
+        soup = _fetch_playwright(source["url"])
         if soup is None:
             continue
         results = source["parser"](soup, draw_type, num_draws)
@@ -269,7 +287,7 @@ def get_draw_results(draw_type: DrawType, num_draws: int = 10) -> list:
     raise RuntimeError(
         f"All sources failed for {draw_type.value}. "
         "Sites may be blocking automated requests. "
-        "Consider a Selenium/Playwright headless browser approach."
+        "Try updating Playwright: playwright install chromium"
     )
 
 
