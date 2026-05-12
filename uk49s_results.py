@@ -114,7 +114,6 @@ def _fetch_playwright(url: str, timeout: int = 30000) -> Optional[BeautifulSoup]
     Returns BeautifulSoup object or None.
     """
     try:
-    try:
         with sync_playwright() as p:
             browser = p.chromium.launch(
                 headless=True,
