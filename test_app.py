@@ -16,7 +16,7 @@ def test_analyse_valid(client):
     data = {'numbers': [1, 2, 3, 4, 5, 6], 'bonus': 7, 'tse': '27'}
     response = client.post('/api/analyse', json=data)
     assert response.status_code == 200
-    assert b'ok' in response.get_json()['ok']
+    assert response.get_json()['ok'] is True
 
 def test_analyse_invalid_numbers(client):
     data = {'numbers': [1, 2, 3], 'bonus': 7}
