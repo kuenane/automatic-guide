@@ -154,6 +154,23 @@ def _fetch_playwright(url: str, timeout: int = 30000) -> Optional[BeautifulSoup]
 # Parsers
 # ===========================================================================
 
+def _extract_nums(tags: list) -> list:
+    """Extract all integers 1-49 from a list of BeautifulSoup tags/cells."""
+    nums = []
+    for tag in tags:
+        text = tag.get_text(strip=True)
+        # Extract all numbers from text (e.g. "Ball 27" -> 27)
+        found = re.findall(r"\d+", text)
+        for val_str in found:
+            try:
+                val = int(val_str)
+                if 1 <= val <= 49:
+                    nums.append(val)
+            except ValueError:
+                continue
+    return nums
+
+
 def _parse_date(date_str: str) -> str:
     """Parse and standardize date string."""
     try:
@@ -164,21 +181,30 @@ def _parse_date(date_str: str) -> str:
 
 
 def _parse_lottonumbers(soup: BeautifulSoup, draw_type: DrawType, limit: int) -> list:
-    """uk.lottonumbers.com: <div class='result'> with date heading + ball <li> tags."""
+    """uk.lottonumbers.com: <div class='result'> or <div class='draw'> with date heading + ball <li> tags."""
     results = []
-    blocks  = soup.select("div.result, article.result")
+    blocks  = soup.select("div.result, article.result, div.draw")
     for block in blocks[:limit]:
-        date_tag  = block.find(["h2", "h3", "h4", "time"])
+        # Date often in strong or headers or just first div
+        date_tag  = block.find(["h2", "h3", "h4", "time", "strong"])
+        if not date_tag:
+             date_container = block.find("div")
+             if date_container:
+                 date_tag = date_container
+
         date_str  = date_tag.get_text(strip=True) if date_tag else "Unknown"
-        ball_tags = block.select("ul.numbers li, ol.numbers li, li.ball, li.number")
+
+        ball_tags = block.select("ul.numbers li, ol.numbers li, li.ball, li.number, .balls li")
         if not ball_tags:
             ball_tags = block.find_all("li")
+
         nums = _extract_nums(ball_tags)
         if len(nums) < 6:
             continue
+
         results.append(DrawResult(
             draw_type  = draw_type,
-            date       = date_str,
+            date       = _parse_date(date_str),
             numbers    = sorted(nums[:6]),
             bonus_ball = nums[6] if len(nums) >= 7 else None,
         ))
@@ -247,21 +273,28 @@ def _parse_text_fallback(soup: BeautifulSoup, draw_type: DrawType, limit: int) -
 
 def _make_sources(draw_type: DrawType) -> list:
     slug = draw_type.value
+    # Fix for lotteryextreme slugs
+    extreme_slug = slug
+    if slug == "brunchtime": extreme_slug = "brunch"
+    if slug == "lunchtime":  extreme_slug = "lunch"
+    if slug == "drivetime":  extreme_slug = "drive"
+    if slug == "teatime":    extreme_slug = "tea"
+
     return [
         {
+            "name":   "za.lottonumbers.com",
+            "url":    f"https://za.lottonumbers.com/uk-49s-{slug}/results",
+            "parser": _parse_lottonumbers,
+        },
+        {
             "name":   "www.lotteryextreme.com",
-            "url":    f"https://www.lotteryextreme.com/49s-{slug}/results",
+            "url":    f"https://www.lotteryextreme.com/49s-{extreme_slug}/results",
             "parser": _parse_lottonumbers,
         },
         {
             "name":   "www.49s.co.uk",
             "url":    f"https://49s.co.uk/49s/results/{slug}",
             "parser": _parse_national_lottery,
-        },
-        {
-            "name":   "za.lottonumbers.com",
-            "url":    f"https://za.lottonumbers.com/uk-49s-{slug}/results",
-            "parser": _parse_lottonumbers,
         },
         {
             "name":   "49sresult.com",
