@@ -18,4 +18,5 @@ ENV PYTHONUNBUFFERED=1
 EXPOSE 5000
 
 # Use shell form to allow variable expansion for PORT
-CMD gunicorn --bind 0.0.0.0:$PORT app:app
+# Increased timeout to 120s for Playwright scraping
+CMD gunicorn --bind 0.0.0.0:$PORT --timeout 120 app:app
