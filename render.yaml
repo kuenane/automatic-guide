@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: uk49s-analyzer
+    runtime: docker
+    plan: free
+    region: oregon
+    envVars:
+      - key: DEBUG
+        value: "false"
+      - key: CACHE_TYPE
+        value: SimpleCache
+      - key: CACHE_DEFAULT_TIMEOUT
+        value: "300"

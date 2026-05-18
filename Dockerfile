@@ -1,15 +1,21 @@
-FROM python:3.11-slim
+FROM mcr.microsoft.com/playwright/python:v1.40.0-jammy
 
 WORKDIR /app
 
+# Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Browsers are pre-installed in this image, but we ensure chromium is ready
+RUN playwright install chromium
+
 COPY . .
 
-# Install Playwright browsers
-RUN playwright install chromium
+# Set environment variables
+ENV PORT=5000
+ENV PYTHONUNBUFFERED=1
 
 EXPOSE 5000
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app"]
+# Use shell form to allow variable expansion for PORT
+CMD gunicorn --bind 0.0.0.0:$PORT app:app
