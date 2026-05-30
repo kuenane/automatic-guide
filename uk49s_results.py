@@ -45,16 +45,18 @@ from dateutil import parser as date_parser
 # ===========================================================================
 
 class DrawType(Enum):
-    BRUNCHTIME = "brunchtime"
-    LUNCHTIME  = "lunchtime"
-    DRIVETIME  = "drivetime"
-    TEATIME    = "teatime"
+    BREAKFASTTIME = "breakfasttime"
+    BRUNCHTIME    = "brunchtime"
+    LUNCHTIME     = "lunchtime"
+    DRIVETIME     = "drivetime"
+    TEATIME       = "teatime"
 
 DRAW_LABELS = {
-    DrawType.BRUNCHTIME: "Brunchtime (11:49 AM UK)",
-    DrawType.LUNCHTIME:  "Lunchtime  (12:49 PM UK)",
-    DrawType.DRIVETIME:  "Drivetime  ( 4:49 PM UK)",
-    DrawType.TEATIME:    "Teatime    ( 5:49 PM UK)",
+    DrawType.BREAKFASTTIME: "Breakfasttime (8:49 AM UK)",
+    DrawType.BRUNCHTIME:    "Brunchtime    (11:49 AM UK)",
+    DrawType.LUNCHTIME:     "Lunchtime     (12:49 PM UK)",
+    DrawType.DRIVETIME:     "Drivetime     ( 4:49 PM UK)",
+    DrawType.TEATIME:       "Teatime       ( 5:49 PM UK)",
 }
 
 
@@ -78,11 +80,12 @@ class DrawResult:
 
 @dataclass
 class AllDrawResults:
-    """Container for results from all four draw types."""
-    brunchtime: list = field(default_factory=list)
-    lunchtime:  list = field(default_factory=list)
-    drivetime:  list = field(default_factory=list)
-    teatime:    list = field(default_factory=list)
+    """Container for results from all five draw types."""
+    breakfasttime: list = field(default_factory=list)
+    brunchtime:    list = field(default_factory=list)
+    lunchtime:     list = field(default_factory=list)
+    drivetime:     list = field(default_factory=list)
+    teatime:       list = field(default_factory=list)
 
     def get(self, draw_type: DrawType) -> list:
         return getattr(self, draw_type.value)
@@ -275,10 +278,11 @@ def _make_sources(draw_type: DrawType) -> list:
     slug = draw_type.value
     # Fix for lotteryextreme slugs
     extreme_slug = slug
-    if slug == "brunchtime": extreme_slug = "brunch"
-    if slug == "lunchtime":  extreme_slug = "lunch"
-    if slug == "drivetime":  extreme_slug = "drive"
-    if slug == "teatime":    extreme_slug = "tea"
+    if slug == "breakfasttime": extreme_slug = "breakfast"
+    if slug == "brunchtime":    extreme_slug = "brunch"
+    if slug == "lunchtime":     extreme_slug = "lunch"
+    if slug == "drivetime":     extreme_slug = "drive"
+    if slug == "teatime":       extreme_slug = "tea"
 
     return [
         {
@@ -565,10 +569,11 @@ def _parse_args():
 
 
 _DRAW_MAP = {
-    "brunch": DrawType.BRUNCHTIME,
-    "lunch":  DrawType.LUNCHTIME,
-    "drive":  DrawType.DRIVETIME,
-    "tea":    DrawType.TEATIME,
+    "breakfast": DrawType.BREAKFASTTIME,
+    "brunch":    DrawType.BRUNCHTIME,
+    "lunch":     DrawType.LUNCHTIME,
+    "drive":     DrawType.DRIVETIME,
+    "tea":       DrawType.TEATIME,
 }
 
 if __name__ == "__main__":

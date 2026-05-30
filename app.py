@@ -64,10 +64,11 @@ logger = logging.getLogger(__name__)
 
 # Draw map config
 DRAW_MAP = {
-    "brunch": uk49s.DrawType.BRUNCHTIME,
-    "lunch":  uk49s.DrawType.LUNCHTIME,
-    "drive":  uk49s.DrawType.DRIVETIME,
-    "tea":    uk49s.DrawType.TEATIME,
+    "breakfast": uk49s.DrawType.BREAKFASTTIME,
+    "brunch":    uk49s.DrawType.BRUNCHTIME,
+    "lunch":     uk49s.DrawType.LUNCHTIME,
+    "drive":     uk49s.DrawType.DRIVETIME,
+    "tea":       uk49s.DrawType.TEATIME,
 }
 
 

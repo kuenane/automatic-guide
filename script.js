@@ -50,6 +50,7 @@ document.querySelectorAll('.pill').forEach(p => {
     document.querySelectorAll('.pill').forEach(x => x.classList.remove('active'));
     p.classList.add('active');
     activeDraw = p.dataset.draw;
+    fetchResults(); // Fetch immediately when filter changes
   });
 });
 
@@ -107,10 +108,11 @@ async function fetchResults() {
 }
 
 const DRAW_META = {
-  brunchtime: { label:'Brunchtime', time:'11:49 AM', weight: 1, icon:'🍳' },
-  lunchtime:  { label:'Lunchtime',  time:'12:49 PM', weight: 2, icon:'🥗' },
-  drivetime:  { label:'Drivetime',  time:'04:49 PM', weight: 3, icon:'🚗' },
-  teatime:    { label:'Teatime',    time:'05:49 PM', weight: 4, icon:'🍵' },
+  breakfasttime: { label:'Breakfast', time:'08:49 AM', weight: 0, icon:'🌅' },
+  brunchtime:    { label:'Brunchtime', time:'11:49 AM', weight: 1, icon:'🍳' },
+  lunchtime:     { label:'Lunchtime',  time:'12:49 PM', weight: 2, icon:'🥗' },
+  drivetime:     { label:'Drivetime',  time:'04:49 PM', weight: 3, icon:'🚗' },
+  teatime:       { label:'Teatime',    time:'05:49 PM', weight: 4, icon:'🍵' },
 };
 
 function renderResults(data) {
