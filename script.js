@@ -117,33 +117,50 @@ function renderResults(data) {
   const container = document.getElementById('resultsContainer');
   let html = '';
 
+  // Flatten all draws into a single list
+  let allDraws = [];
   for (const [dtype, draws] of Object.entries(data)) {
-    const meta = DRAW_META[dtype] || { label: dtype, time:'', icon:'🎱' };
+    draws.forEach(d => {
+      allDraws.push({ ...d, type: dtype });
+    });
+  }
+
+  // Sort by date (descending)
+  allDraws.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  // Group by date
+  const groupedByDate = {};
+  allDraws.forEach(d => {
+    if (!groupedByDate[d.date]) groupedByDate[d.date] = [];
+    groupedByDate[d.date].push(d);
+  });
+
+  for (const [date, draws] of Object.entries(groupedByDate)) {
     html += `
       <div class="draw-section">
         <div class="draw-header">
-          <div class="draw-icon" style="background:rgba(0,212,255,.1)" role="img" aria-label="${meta.label} icon">${meta.icon}</div>
-          <div class="draw-title">${meta.label.toUpperCase()}</div>
+          <div class="draw-title">${date.toUpperCase()}</div>
           <span class="draw-count">${draws.length} draw${draws.length!==1?'s':''}</span>
-          <span class="draw-time">${meta.time}</span>
-        </div>`;
+        </div>
+        <div class="results-grid">`;
 
-    if (draws.length === 0) {
-      html += `<div class="empty"><div class="icon">📭</div><p>No results available</p></div>`;
-    } else {
-      html += `<div class="results-grid">`;
-      for (const r of draws) {
-        html += `<div class="result-card">
-          <div class="result-date">${r.date}</div>
+    // Sort draws within the same day by time if possible,
+    // but here we just rely on the order they were provided or type
+    for (const r of draws) {
+      const meta = DRAW_META[r.type] || { label: r.type, icon: '🎱' };
+      html += `
+        <div class="result-card">
+          <div class="draw-header" style="border:none; margin-bottom:5px; padding:0;">
+            <div class="draw-icon" style="width:20px; height:20px; font-size:12px; background:rgba(0,212,255,.1)">${meta.icon}</div>
+            <div class="draw-title" style="font-size:12px;">${meta.label}</div>
+          </div>
           <div class="balls">
             ${r.numbers.map(n => ballHTML(n)).join('')}
             ${r.bonus_ball !== null ? `<span class="ball-divider">|</span>${ballHTML(r.bonus_ball,'bonus')}` : ''}
           </div>
         </div>`;
-      }
-      html += `</div>`;
     }
-    html += `</div>`;
+    html += `</div></div>`;
   }
 
   container.innerHTML = html || `<div class="empty"><div class="icon">📭</div><p>No data returned</p></div>`;
@@ -205,7 +222,7 @@ async function runAnalysis() {
     return isNaN(v) ? null : v;
   });
   const bonus = parseInt(document.getElementById('r7').value);
-  const tse   = document.getElementById('tseInput').value.trim() || null;
+  const tse   = null;
 
   // Client-side validation
   if (numbers.some(n => n === null) || numbers.some(n => n < 1 || n > 49)) {
@@ -240,69 +257,18 @@ function renderAnalysis(data, numbers, bonus) {
   const out = document.getElementById('analysisOutput');
   out.classList.add('show');
 
-  // ── Intermediates
+  // ── Variables v, w, x, y, z
   const xGrid = document.getElementById('xGrid');
-  xGrid.innerHTML = Object.entries(data.intermediates).map(([k,v]) =>
-    `<div class="x-item"><div class="x-label">${k}</div><div class="x-val">${v}</div></div>`
+  xGrid.innerHTML = Object.entries(data.variables).map(([k,v]) =>
+    `<div class="x-item"><div class="x-label">${k.toUpperCase()}</div><div class="x-val">${v}</div></div>`
   ).join('');
-
-  // ── Sets
-  const sGrid = document.getElementById('setsGrid');
-  const SET_LABELS = {
-    S1: 'Concat/Add', S2: 'Neighbour', S3: 'Date ±2', S4: 'TSE Digits', S5: 'x1–x3 Combos'
-  };
-  sGrid.innerHTML = Object.entries(data.sets).map(([key, nums]) => `
-    <div class="set-chip">
-      <div class="set-label">${key} — ${SET_LABELS[key]||''}</div>
-      <div class="set-nums">
-        ${nums.length ? nums.map(miniBallHTML).join('') : '<span style="color:var(--muted);font-size:11px;">none in 1–49</span>'}
-      </div>
-    </div>`
-  ).join('');
-
-  // ── By colour
-  const colGroup = document.getElementById('colourGroups');
-  if (data.colour_analysis.length === 0) {
-    colGroup.innerHTML = `<div class="empty" style="padding:20px"><p>No colour group has 3+ numbers</p></div>`;
-  } else {
-    colGroup.innerHTML = data.colour_analysis.map(g => `
-      <div class="group-card gc-${g.colour}">
-        <div class="group-header">
-          <span class="mini-ball c-${g.colour}" style="flex-shrink:0">&nbsp;</span>
-          <span class="group-name">${g.colour}</span>
-          <span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--muted)">${g.numbers.length} numbers</span>
-        </div>
-        <div class="group-nums">${g.numbers.map(i => tagBallHTML(i.number, i.set)).join('')}</div>
-        <div class="section-label" style="margin-top:8px;margin-bottom:6px">3-ball combinations (${g.combos.length})</div>
-        <div class="combos">${g.combos.map(c => `<span class="combo-tag">${c.join(' · ')}</span>`).join('')}</div>
-      </div>`
-    ).join('');
-  }
-
-  // ── By ending digit
-  const digGroup = document.getElementById('digitGroups');
-  if (data.digit_analysis.length === 0) {
-    digGroup.innerHTML = `<div class="empty" style="padding:20px"><p>No ending-digit group has 3+ numbers</p></div>`;
-  } else {
-    digGroup.innerHTML = data.digit_analysis.map(g => `
-      <div class="group-card gc-digit">
-        <div class="group-header">
-          <span class="group-name">Ends in ${g.digit}</span>
-          <span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--muted)">${g.numbers.length} numbers</span>
-        </div>
-        <div class="group-nums">${g.numbers.map(i => tagBallHTML(i.number, i.set)).join('')}</div>
-        <div class="section-label" style="margin-top:8px;margin-bottom:6px">3-ball combinations (${g.combos.length})</div>
-        <div class="combos">${g.combos.map(c => `<span class="combo-tag">${c.join(' · ')}</span>`).join('')}</div>
-      </div>`
-    ).join('');
-  }
 }
 
 // ── Utility helpers ───────────────────────────────────────
 function setLoading(btn, spinner, label, loading) {
   btn.disabled = loading;
   spinner.classList.toggle('show', loading);
-  label.textContent = loading ? 'Loading…' : (btn === fetchBtn ? 'Fetch Results' : 'Run Analysis');
+  label.textContent = loading ? 'Loading…' : (btn === fetchBtn ? 'Fetch Results' : 'Generate V-Z');
 }
 function showErr(el, msg) {
   el.textContent = msg;

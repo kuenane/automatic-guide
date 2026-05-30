@@ -492,7 +492,7 @@ header {
   <!-- Tabs -->
   <div class="tabs">
     <button class="tab active" data-tab="results">Results</button>
-    <button class="tab" data-tab="analyser">Analyser</button>
+    <button class="tab" data-tab="analyser">Generator</button>
   </div>
 
   <!-- ═══════════════════════════════════════════════════ Results Panel -->
@@ -570,14 +570,9 @@ header {
             </div>
           </div>
 
-          <div class="field-row">
-            <label for="tseInput">TSE value <span style="font-weight:300;text-transform:none;">(optional — auto-calculated if blank)</span></label>
-            <input class="tse-input" id="tseInput" type="text" maxlength="4" placeholder="e.g. 27" aria-label="TSE value" />
-          </div>
-
           <button class="btn btn-primary" id="analyseBtn" style="width:100%;justify-content:center;margin-top:4px;">
             <span class="spinner" id="analyseSpinner"></span>
-            <span id="analyseBtnLabel">Run Analysis</span>
+            <span id="analyseBtnLabel">Generate V-Z</span>
           </button>
         </div>
       </div>
@@ -589,32 +584,14 @@ header {
 
           <!-- Intermediates -->
           <div class="analysis-card" id="cardIntermediates">
-            <h4>Intermediate Values <span class="badge">x1 – x9</span></h4>
+            <h4>Generated Variables <span class="badge">v – z</span></h4>
             <div class="x-grid" id="xGrid"></div>
-          </div>
-
-          <!-- Sets -->
-          <div class="analysis-card" id="cardSets">
-            <h4>Candidate Sets</h4>
-            <div class="sets-grid" id="setsGrid"></div>
-          </div>
-
-          <!-- By colour -->
-          <div class="analysis-card" id="cardColour">
-            <h4>By Colour <span class="badge">3+ numbers</span></h4>
-            <div class="group-list" id="colourGroups"></div>
-          </div>
-
-          <!-- By ending digit -->
-          <div class="analysis-card" id="cardDigit">
-            <h4>By Ending Digit <span class="badge">3+ numbers</span></h4>
-            <div class="group-list" id="digitGroups"></div>
           </div>
 
         </div>
         <div id="analyserEmpty" class="empty">
           <div class="icon">🔬</div>
-          <p>Enter a previous draw result and click <strong>Run Analysis</strong></p>
+          <p>Enter a previous draw result and click <strong>Generate V-Z</strong></p>
         </div>
       </div>
 

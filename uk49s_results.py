@@ -405,159 +405,41 @@ def _concat(a: int, b: int) -> int:
 
 def _build_sets(numbers: list, bonus: int) -> dict:
     """
-    Compute intermediate values x1-x9 and candidate sets S1, S2, S3, S5.
+    Compute variables v, w, x, y, z from balls r1-r7.
 
     Args:
         numbers: 6 main draw balls (ints).
         bonus:   Bonus/booster ball (int).
 
     Returns:
-        Dict with keys 'x' (intermediates), 'S1', 'S2', 'S3', 'S5'.
+        Dict with key 'x' containing v, w, x, y, z.
     """
     r1, r2, r3, r4, r5, r6 = numbers
     r7 = bonus
 
-    x_sum6 = r1 + r2 + r3 + r4 + r5 + r6
-    x_sum7 = x_sum6 + r7
+    v = r1 + r2 + r3 + r4 + r5 + r6
+    w = v + r7
 
-    x1, x2, x3 = x_sum6, x_sum6, x_sum6
-    x4, x5, x6 = x_sum7, x_sum7, x_sum7
-    x7 = x1 + x2 + x3        # 3 * x_sum6
-    x8 = x4 + x5 + x6        # 3 * x_sum7
-    x9 = x7 + x8             # 3 * (x_sum6 + x_sum7)
-
-    # Set 1 — concatenation / addition combos
-    s1_candidates = [
-        _concat(x4, x5),
-        _concat(x4, x5) + x6,
-        _concat(x4, x6),
-        _concat(x4, x5) + x8,
-        _concat(x7, x8),
-        _concat(x7, x9),
-        _concat(x7, x8) + x9,
-        _concat(x4, x4) + _concat(x7, x8),
-    ]
-    S1 = [n for n in s1_candidates if _clamp(n) is not None]
-
-    # Set 2 — neighbour shifts for x4-x9
-    S2 = []
-    for val in [x4, x5, x6, x7, x8, x9]:
-        if 20 <= val <= 29:
-            c = _clamp(val + 10)
-            if c: S2.append(c)
-        elif 30 <= val <= 39:
-            for adj in [val + 10, val - 10]:
-                c = _clamp(adj)
-                if c: S2.append(c)
-        elif 40 <= val <= 49:
-            c = _clamp(val - 10)
-            if c: S2.append(c)
-        else:
-            c = _clamp(val)
-            if c: S2.append(c)
-
-    # Set 3 — today's date neighbourhood
-    day = datetime.now().day
-    S3  = [n for n in [day - 2, day - 1, day, day + 1, day + 2] if _clamp(n) is not None]
-
-    # Set 5 — x1-x3 concatenation combos
-    s5_candidates = [
-        _concat(x1, x2),
-        _concat(x1, x2) + x3,
-        _concat(x1, x3),
-    ]
-    S5 = [n for n in s5_candidates if _clamp(n) is not None]
+    x = v * 3
+    y = w * 3
+    z = x + y
 
     return {
-        "x":  dict(x1=x1, x2=x2, x3=x3, x4=x4, x5=x5, x6=x6, x7=x7, x8=x8, x9=x9),
-        "S1": S1,
-        "S2": S2,
-        "S3": S3,
-        "S5": S5,
+        "x": dict(v=v, w=w, x=x, y=y, z=z)
     }
 
 
-def _print_analysis(sets: dict, S4: list, draw_label: str = "") -> None:
-    """Render the full analysis report to stdout."""
-    S1, S2, S3, S5 = sets["S1"], sets["S2"], sets["S3"], sets["S5"]
-
+def _print_analysis(sets: dict, draw_label: str = "") -> None:
+    """Render the variables to stdout."""
     bar  = "=" * 60
-    dash = "-" * 60
     print(f"\n{bar}")
     if draw_label:
         print(f"  ANALYSIS — {draw_label}")
     print(f"{bar}")
 
-    # Intermediate values
-    print("\n  Intermediate values (x1-x9):")
-    for k, v in sets["x"].items():
-        print(f"    {k} = {v}")
-
-    # Sets summary
-    def _fmt(label, lst):
-        items = ", ".join(str(n) for n in lst) if lst else "(none in range 1-49)"
-        print(f"\n  {label}: {items}")
-
-    _fmt("Set 1 — concat/add combos          (S1)", S1)
-    _fmt("Set 2 — neighbour shifts            (S2)", S2)
-    _fmt("Set 3 — date neighbourhood          (S3)", S3)
-    _fmt("Set 4 — TSE digits                  (S4)", S4)
-    _fmt("Set 5 — x1-x3 combos               (S5)", S5)
-
-    all_sets   = [S1, S2, S3, S4, S5]
-    set_labels = ["S1", "S2", "S3", "S4", "S5"]
-
-    # Build flat tagged list: (number, set_label)
-    tagged = []
-    for lbl, s in zip(set_labels, all_sets):
-        for n in s:
-            tagged.append((n, lbl))
-
-    # --- By colour ---
-    print(f"\n{dash}")
-    print("  BY COLOUR  (groups with 3+ numbers)")
-    print(f"{dash}")
-    colour_groups: dict = {}
-    for n, lbl in tagged:
-        colour_groups.setdefault(_colour_of(n), []).append((n, lbl))
-
-    found = False
-    for colour in ["Red", "Orange", "Yellow", "Green", "Blue", "Brown", "Purple"]:
-        items = colour_groups.get(colour, [])
-        if len(items) >= 3:
-            found = True
-            display  = ", ".join(f"{n}({l})" for n, l in items)
-            nums_int = [n for n, _ in items]
-            combos   = list(itertools.combinations(nums_int, 3))
-            print(f"\n  {colour}:  {display}")
-            print(f"  3-ball combos ({len(combos)}):")
-            for combo in combos:
-                print(f"    {combo}")
-    if not found:
-        print("  (No colour group has 3+ numbers)")
-
-    # --- By ending digit ---
-    print(f"\n{dash}")
-    print("  BY ENDING DIGIT  (groups with 3+ numbers)")
-    print(f"{dash}")
-    digit_groups: dict = {}
-    for n, lbl in tagged:
-        digit_groups.setdefault(n % 10, []).append((n, lbl))
-
-    found = False
-    for digit in sorted(digit_groups.keys()):
-        items = digit_groups[digit]
-        if len(items) >= 3:
-            found = True
-            display  = ", ".join(f"{n}({l})" for n, l in items)
-            nums_int = [n for n, _ in items]
-            combos   = list(itertools.combinations(nums_int, 3))
-            print(f"\n  Ending in {digit}:  {display}")
-            print(f"  3-ball combos ({len(combos)}):")
-            for combo in combos:
-                print(f"    {combo}")
-    if not found:
-        print("  (No ending-digit group has 3+ numbers)")
+    print("\n  Variables (v, w, x, y, z):")
+    for k, val in sets["x"].items():
+        print(f"    {k} = {val}")
 
     print(f"\n{bar}\n")
 
@@ -574,27 +456,14 @@ def analyse(
     Args:
         numbers:    List of exactly 6 main draw numbers (ints, 1-49).
         bonus_ball: Bonus/booster ball number (int, 1-49).
-        tse:        2-character TSE string (e.g. "27").
-                    If None, the sum of all 7 balls is used automatically.
+        tse:        Not used.
         draw_label: Optional string shown in the report header.
     """
     if len(numbers) != 6:
         raise ValueError(f"Expected 6 numbers, got {len(numbers)}")
 
     sets = _build_sets(list(numbers), bonus_ball)
-
-    # Set 4 from TSE
-    if tse is None:
-        tse_val = str(sets["x"]["x4"])   # default: sum of 7 balls
-    else:
-        tse_val = str(tse).strip()
-
-    d1 = int(tse_val[0]) if len(tse_val) > 0 and tse_val[0].isdigit() else 0
-    d2 = int(tse_val[1]) if len(tse_val) > 1 and tse_val[1].isdigit() else 0
-    S4 = [n for n in [d1, d2, d1 + d2] if 1 <= n <= 49]
-
-    sets["S4"] = S4
-    _print_analysis(sets, S4, draw_label)
+    _print_analysis(sets, draw_label)
 
 
 def analyse_manual() -> None:
