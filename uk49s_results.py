@@ -347,10 +347,10 @@ def get_draw_results(draw_type: DrawType, num_draws: int = 10) -> list:
 
 def get_all_draws(num_draws: int = 10) -> AllDrawResults:
     """
-    Fetch the last N results for ALL four UK 49s draw types.
+    Fetch the last N results for ALL five UK 49s draw types.
 
     Returns:
-        AllDrawResults with .brunchtime / .lunchtime / .drivetime / .teatime lists.
+        AllDrawResults with .breakfasttime / .brunchtime / .lunchtime / .drivetime / .teatime lists.
         Failed draw types return an empty list (error printed, not raised).
     """
     container = AllDrawResults()
