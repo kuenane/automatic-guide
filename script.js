@@ -107,10 +107,10 @@ async function fetchResults() {
 }
 
 const DRAW_META = {
-  brunchtime: { label:'Brunchtime', time:'11:49 AM UK', icon:'🍳' },
-  lunchtime:  { label:'Lunchtime',  time:'12:49 PM UK', icon:'🥗' },
-  drivetime:  { label:'Drivetime',  time:'04:49 PM UK', icon:'🚗' },
-  teatime:    { label:'Teatime',    time:'05:49 PM UK', icon:'🍵' },
+  brunchtime: { label:'Brunchtime', time:'11:49 AM', weight: 1, icon:'🍳' },
+  lunchtime:  { label:'Lunchtime',  time:'12:49 PM', weight: 2, icon:'🥗' },
+  drivetime:  { label:'Drivetime',  time:'04:49 PM', weight: 3, icon:'🚗' },
+  teatime:    { label:'Teatime',    time:'05:49 PM', weight: 4, icon:'🍵' },
 };
 
 function renderResults(data) {
@@ -135,7 +135,13 @@ function renderResults(data) {
     groupedByDate[d.date].push(d);
   });
 
+  // For the Generator page "recent results" variable display
+  renderRecentVariables(allDraws.slice(0, 20));
+
   for (const [date, draws] of Object.entries(groupedByDate)) {
+    // Sort draws within the same day by weight (chronological)
+    draws.sort((a, b) => (DRAW_META[a.type]?.weight || 0) - (DRAW_META[b.type]?.weight || 0));
+
     html += `
       <div class="draw-section">
         <div class="draw-header">
@@ -144,15 +150,13 @@ function renderResults(data) {
         </div>
         <div class="results-grid">`;
 
-    // Sort draws within the same day by time if possible,
-    // but here we just rely on the order they were provided or type
     for (const r of draws) {
       const meta = DRAW_META[r.type] || { label: r.type, icon: '🎱' };
       html += `
         <div class="result-card">
           <div class="draw-header" style="border:none; margin-bottom:5px; padding:0;">
             <div class="draw-icon" style="width:20px; height:20px; font-size:12px; background:rgba(0,212,255,.1)">${meta.icon}</div>
-            <div class="draw-title" style="font-size:12px;">${meta.label}</div>
+            <div class="draw-title" style="font-size:12px;">${meta.label} (${meta.time})</div>
           </div>
           <div class="balls">
             ${r.numbers.map(n => ballHTML(n)).join('')}
@@ -164,6 +168,53 @@ function renderResults(data) {
   }
 
   container.innerHTML = html || `<div class="empty"><div class="icon">📭</div><p>No data returned</p></div>`;
+}
+
+function calculateVZ(numbers, bonus) {
+  const v = numbers.reduce((a, b) => a + b, 0);
+  const w = v + (bonus || 0);
+  const x = v * 3;
+  const y = w * 3;
+  const z = x + y;
+  return { v, w, x, y, z };
+}
+
+function renderRecentVariables(draws) {
+  const tableContainer = document.getElementById('recentVariablesContainer');
+  if (!tableContainer) return;
+
+  let html = `
+    <table class="var-table">
+      <thead>
+        <tr>
+          <th>Draw</th>
+          <th>Date</th>
+          <th>V</th>
+          <th>W</th>
+          <th>X</th>
+          <th>Y</th>
+          <th>Z</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+  draws.forEach(d => {
+    const meta = DRAW_META[d.type] || { label: d.type };
+    const vars = calculateVZ(d.numbers, d.bonus_ball);
+    html += `
+      <tr>
+        <td style="font-size:11px">${meta.label}</td>
+        <td style="font-size:11px">${d.date}</td>
+        <td>${vars.v}</td>
+        <td>${vars.w}</td>
+        <td>${vars.x}</td>
+        <td>${vars.y}</td>
+        <td style="font-weight:500; color:var(--accent)">${vars.z}</td>
+      </tr>`;
+  });
+
+  html += '</tbody></table>';
+  tableContainer.innerHTML = html;
 }
 
 // ── Auto-fill buttons ─────────────────────────────────────
@@ -274,3 +325,7 @@ function showErr(el, msg) {
   el.textContent = msg;
   el.classList.add('show');
 }
+// Auto-fetch on load
+window.addEventListener('DOMContentLoaded', () => {
+  fetchResults();
+});
