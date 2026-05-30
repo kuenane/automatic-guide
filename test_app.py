@@ -13,7 +13,7 @@ def test_health(client):
     assert b'ok' in response.data
 
 def test_analyse_valid(client):
-    data = {'numbers': [1, 2, 3, 4, 5, 6], 'bonus': 7, 'tse': '27'}
+    data = {'numbers': [1, 2, 3, 4, 5, 6], 'bonus': 7}
     response = client.post('/api/analyse', json=data)
     assert response.status_code == 200
     assert response.get_json()['ok'] is True
@@ -24,6 +24,6 @@ def test_analyse_invalid_numbers(client):
     assert response.status_code == 400
 
 def test_build_analysis():
-    result = _build_analysis([1, 2, 3, 4, 5, 6], 7, '27')
-    assert 'sets' in result
-    assert 'S1' in result['sets']
+    result = _build_analysis([1, 2, 3, 4, 5, 6], 7, None)
+    assert 'variables' in result
+    assert 'v' in result['variables']

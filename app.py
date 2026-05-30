@@ -88,69 +88,8 @@ def _build_analysis(numbers: list, bonus: int, tse: str | None) -> dict:
     """Run the analyser and return a JSON-serialisable dict."""
     sets = uk49s._build_sets(numbers, bonus)
 
-    # Set 4
-    if tse is None:
-        tse_val = str(sets["x"]["x4"])
-    else:
-        tse_val = str(tse).strip()
-
-    d1 = int(tse_val[0]) if len(tse_val) > 0 and tse_val[0].isdigit() else 0
-    d2 = int(tse_val[1]) if len(tse_val) > 1 and tse_val[1].isdigit() else 0
-    S4 = [n for n in [d1, d2, d1 + d2] if 1 <= n <= 49]
-    sets["S4"] = S4
-
-    S1, S2, S3, S5 = sets["S1"], sets["S2"], sets["S3"], sets["S5"]
-    all_sets   = [S1, S2, S3, S4, S5]
-    set_labels = ["S1", "S2", "S3", "S4", "S5"]
-
-    tagged = []
-    for lbl, s in zip(set_labels, all_sets):
-        for n in s:
-            tagged.append({"number": n, "set": lbl, "colour": uk49s._colour_of(n)})
-
-    # By colour
-    colour_groups: dict = {}
-    for item in tagged:
-        colour_groups.setdefault(item["colour"], []).append(item)
-
-    colour_analysis = []
-    for colour in ["Red", "Orange", "Yellow", "Green", "Blue", "Brown", "Purple"]:
-        items = colour_groups.get(colour, [])
-        if len(items) >= 3:
-            nums   = [i["number"] for i in items]
-            combos = [list(c) for c in itertools.combinations(nums, 3)]
-            colour_analysis.append({
-                "colour":  colour,
-                "numbers": items,
-                "combos":  combos,
-            })
-
-    # By ending digit
-    digit_groups: dict = {}
-    for item in tagged:
-        digit_groups.setdefault(item["number"] % 10, []).append(item)
-
-    digit_analysis = []
-    for digit in sorted(digit_groups.keys()):
-        items = digit_groups[digit]
-        if len(items) >= 3:
-            nums   = [i["number"] for i in items]
-            combos = [list(c) for c in itertools.combinations(nums, 3)]
-            digit_analysis.append({
-                "digit":   digit,
-                "numbers": items,
-                "combos":  combos,
-            })
-
     return {
-        "intermediates": sets["x"],
-        "sets": {
-            "S1": S1, "S2": S2, "S3": S3, "S4": S4, "S5": S5,
-        },
-        "tagged":          tagged,
-        "colour_analysis": colour_analysis,
-        "digit_analysis":  digit_analysis,
-        "tse_used":        tse_val,
+        "variables": sets["x"]
     }
 
 
